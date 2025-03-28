@@ -49,9 +49,10 @@ namespace Movies.Presentation
 
                 using var serviceScope = app.Services.CreateScope();
                 using var dbContext = serviceScope.ServiceProvider.GetRequiredService<MoviesDbContext>();
-                dbContext?.Database.Migrate();
-
-                Console.WriteLine("Im working");
+                if (!dbContext.Database.CanConnect())
+                {
+                    dbContext.Database.Migrate();
+                }
             }
 
 
