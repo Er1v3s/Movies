@@ -65,7 +65,7 @@ ARG BUILD_CONFIGURATION=Development
 
 RUN dotnet publish "./Movies.Presentation.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-FROM base as final
+FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 

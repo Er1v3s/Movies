@@ -1,4 +1,3 @@
-
 using Microsoft.EntityFrameworkCore;
 using Movies.Application;
 using Movies.Infrastructure;
@@ -32,17 +31,13 @@ namespace Movies.Presentation
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            //builder.Services.AddDbContext<MoviesDbContext>(opt =>
-            //{
-            //    opt.UseSqlite(builder.Configuration.GetConnectionString("DbConnectionString"));
-            //});
 
             builder.Services.AddDbContext<MoviesDbContext>(opt =>
             {
                 opt.UseSqlServer(builder.Configuration.GetConnectionString("DbConnectionString"));
             });
 
-            builder.Services.AddCors(opt => 
+            builder.Services.AddCors(opt =>
             {
                 opt.AddPolicy("CorsPolicy", policyBuilder =>
                 {
@@ -56,8 +51,6 @@ namespace Movies.Presentation
             builder.Services.AddApplication();
             builder.Services.AddExceptionHandler<ExceptionHandler>();
 
-            
-
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())
@@ -65,15 +58,17 @@ namespace Movies.Presentation
                 app.UseSwagger();
                 app.UseSwaggerUI();
 
-                using var serviceScope = app.Services.CreateScope();
-                using var dbContext = serviceScope.ServiceProvider.GetRequiredService<MoviesDbContext>();
-
-                if (!dbContext.Database.CanConnect())
+                try
                 {
+                    using var serviceScope = app.Services.CreateScope();
+                    var dbContext = serviceScope.ServiceProvider.GetRequiredService<MoviesDbContext>();
                     dbContext.Database.Migrate();
                 }
+                catch (Exception)
+                {
+                    Console.WriteLine("info: Cannot execute migrations. Database is already up to date");
+                }
             }
-
 
             app.UseExceptionHandler(_ => { });
             app.UseCors("CorsPolicy");
