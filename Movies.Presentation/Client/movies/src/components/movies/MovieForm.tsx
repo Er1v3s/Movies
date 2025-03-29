@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { MovieDto } from "../../models/movieDto.ts";
 import { ChangeEvent, useEffect, useState } from "react";
 import apiConnector from "../../api/apiConnector.ts";
-import { Button, Form, Header, Segment } from "semantic-ui-react";
+import { Button, Form, Segment } from "semantic-ui-react";
 
 export default function MovieForm() {
 

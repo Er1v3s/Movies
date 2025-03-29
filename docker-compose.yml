@@ -1,25 +1,93 @@
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+   driver: local
+
+   
 services:
   movies.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=3000
-      - ASPNETCORE_HTTPS_PORTS=3001
+      - ASPNETCORE_HTTP_PORTS=2000
+      - ASPNETCORE_HTTPS_PORTS=2001
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/movies.pfx
+      - Otel__Endpoint=http://otel-collector:4317
     container_name: movies.api
     image: movies.api
     build:
       context: .
       dockerfile: Movies.Presentation/Dockerfile
     ports:
-      - "3000:3000"
-      - "3001:3001"
+      - "2000:2000"
+      - "2001:2001"
     volumes:
       - ~/.aspnet/https:/https:ro
     depends_on:
       database.server:
         condition: service_healthy
-  
+      otel-collector:
+        condition: service_started
+    networks:
+      - monitoring
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.95.0
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./Movies.Presentation/config/otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "8888:8888" 
+      - "8889:8889" 
+      - "13133:13133"
+      - "4317:4317"
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    volumes:
+      - ./Movies.Presentation/config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.5.0
+    container_name: node_exporter
+    command: '--path.rootfs=/host'
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitoring
+
   database.server:
     image: "mcr.microsoft.com/mssql/server"
     container_name: database.server
@@ -31,13 +99,14 @@ services:
     volumes:
       - ./sqlserver/data:/var/opt/mssql/data
       - ./sqlserver/log:/var/opt/mssql/log
-        
     healthcheck:
       test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "SuperPassword123" -Q "SELECT 1" || exit 1
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 30s
+    networks:
+      - monitoring
       
   movies.client:
     build:
@@ -52,3 +121,5 @@ services:
     volumes:
       - ./Movies.Presentation/Client/movies:/app
       - /app/node_modules
+    networks:
+      - monitoring

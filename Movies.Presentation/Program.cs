@@ -1,10 +1,11 @@
 
 using Microsoft.EntityFrameworkCore;
 using Movies.Application;
-using Movies.Domain.Entities;
 using Movies.Infrastructure;
 using Movies.Presentation.Handlers;
 using Movies.Presentation.Modules;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 
 namespace Movies.Presentation
 {
@@ -13,6 +14,21 @@ namespace Movies.Presentation
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            builder.Services.AddOpenTelemetry()
+                .WithMetrics(opt =>
+
+                    opt
+                        .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("MoviesAPI"))
+                        .AddAspNetCoreInstrumentation()
+                        .AddHttpClientInstrumentation()
+                        .AddRuntimeInstrumentation()
+                        .AddProcessInstrumentation()
+                        .AddOtlpExporter(opts =>
+                        {
+                            opts.Endpoint = new Uri(builder.Configuration["Otel:Endpoint"]);
+                        })
+                );
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
@@ -40,6 +56,8 @@ namespace Movies.Presentation
             builder.Services.AddApplication();
             builder.Services.AddExceptionHandler<ExceptionHandler>();
 
+            
+
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())
@@ -49,6 +67,7 @@ namespace Movies.Presentation
 
                 using var serviceScope = app.Services.CreateScope();
                 using var dbContext = serviceScope.ServiceProvider.GetRequiredService<MoviesDbContext>();
+
                 if (!dbContext.Database.CanConnect())
                 {
                     dbContext.Database.Migrate();
